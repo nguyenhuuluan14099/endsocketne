@@ -1,107 +1,164 @@
 const express = require("express");
-
 const app = express();
-const http = require("http");
-const server = http.createServer(app);
+const server = require("http").createServer(app); // Replace `app` with your Express app instance
 const cors = require("cors");
-app.use(cors());
+
 const io = require("socket.io")(server, {
   cors: {
-    origin: "*",
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
   },
 });
-// const io = require("socket.io")(8900, {
-//   cors: {
-//     origin: "*",
-//   },
-// });
-// origin: "https://socialclient.vercel.app",
-
 let users = [];
 
-const removeUser = (socketId) => {
-  users = users.filter((user) => user.socketId !== socketId);
-};
-
-const addUser = (userId, socketId) => {
-  !users.some((user) => user.userId === userId) &&
-    userId !== null &&
-    users.push({ userId, socketId });
-};
-
-//get your friend receiver
-const getUser = (userId) => {
-  return users.find((user) => user.userId === userId);
-};
-
-let userList = [];
-const addNewUser01 = (username, socketId) => {
-  !userList.some((user) => user.username === username) &&
-    userList.push({ username, socketId });
-};
-
-const removeUser01 = (socketId) => {
-  userList = userList.filter((user) => user.socketId !== socketId);
-};
-
-const getUser01 = (username) => {
-  return userList.find((user) => user.username === username);
-};
-
-//when connected
 io.on("connection", (socket) => {
-  console.log("a user connected");
-
-  //get userId and socketId from user
-  socket.on("addUser", (userId) => {
-    addUser(userId, socket.id);
-
-    io.emit("getUsers", users);
-  });
-
-  socket.on("addNewUser01", (username) => {
-    addNewUser01(username, socket.id);
-    // io.emit("getUsers01", userList);
-  });
-
-  // socket.on("demoSocket", (data) => {
-  //   io.emit("nguyenluan", data);
-  // });
-
-  //get and send message
-
-  socket.on("sendMessage", ({ senderId, receiverId, text, imageMes }) => {
-    const user = getUser(receiverId);
-    io.to(user?.socketId).emit("getMessages", {
-      senderId,
-      text,
-      imageMes,
+  socket.on("joinUser", (user) => {
+    users.push({
+      id: user._id,
+      socketId: socket.id,
+      followers: user.followers,
+      user,
     });
+    socket.emit("userOnline", users);
   });
 
-  socket.on(
-    "sendNotification",
-    ({ senderName, receiverName, type, senderImg, ...rest }) => {
-      const user = getUser01(receiverName);
-      io.to(user?.socketId).emit("getNotifications", {
-        senderName,
-        type,
-        senderImg,
-        ...rest,
+  //likes
+  socket.on("likePost", (newPost) => {
+    const ids = [...newPost.user.followers, newPost.user._id];
+    const clients = users.filter((user) => ids.includes(user.id));
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        socket.to(`${client.socketId}`).emit("likeToClient", newPost);
       });
     }
-  );
+  });
 
-  //when disconnected
+  //unlike
+  socket.on("unLikePost", (newPost) => {
+    const ids = [...newPost.user.followers, newPost.user._id];
+    const clients = users.filter((user) => ids.includes(user.id));
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        socket.to(`${client.socketId}`).emit("unLikeToClient", newPost);
+      });
+    }
+  });
+
+  //like and unLike comment
+  socket.on("likeComment", (newPost) => {
+    const ids = [...newPost.user.followers, newPost.user._id];
+    const clients = users.filter((user) => ids.includes(user.id));
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        socket.to(`${client.socketId}`).emit("likeCommentToClient", newPost);
+      });
+    }
+  });
+  socket.on("unLikeComment", (newPost) => {
+    const ids = [...newPost.user.followers, newPost.user._id];
+    const clients = users.filter((user) => ids.includes(user.id));
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        socket.to(`${client.socketId}`).emit("unLikeCommentToClient", newPost);
+      });
+    }
+  });
+
+  //comment
+  socket.on("createComment", (newPost) => {
+    const ids = [...newPost.user.followers, newPost.user._id];
+    const clients = users.filter((user) => ids.includes(user.id));
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        socket.to(`${client.socketId}`).emit("createCommentToClient", newPost);
+      });
+    }
+  });
+  socket.on("deleteComment", (newPost) => {
+    const ids = [...newPost.user.followers, newPost.user._id];
+    const clients = users.filter((user) => ids.includes(user.id));
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        socket.to(`${client.socketId}`).emit("deleteCommentToClient", newPost);
+      });
+    }
+  });
+
+  //follow
+  socket.on("follow", (newUser) => {
+    const user = users.find((user) => user.id === newUser._id);
+    user && socket.to(`${user.socketId}`).emit("followToClient", newUser);
+  });
+
+  socket.on("unFollow", (newUser) => {
+    const user = users.find((user) => user.id === newUser._id);
+    user && socket.to(`${user.socketId}`).emit("unFollowToClient", newUser);
+  });
+
+  //notification
+  socket.on("createNotify", (msg) => {
+    const clients = users.filter((user) => msg.recipients.includes(user.id));
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        socket.to(`${client.socketId}`).emit("createNotifyToClient", msg);
+      });
+    }
+  });
+  socket.on("removeNotify", (msg) => {
+    const clients = users.filter((user) => msg.recipients.includes(user.id));
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        socket.to(`${client.socketId}`).emit("removeNotifyToClient", msg);
+      });
+    }
+  });
+
+  //message
+  socket.on("addMessage", (msg) => {
+    const user = users.find((user) => user.id === msg.recipient);
+    user && socket.to(`${user.socketId}`).emit("addMessageToClient", msg);
+  });
+
+  //check user online
+  socket.on("checkUserOnline", (data) => {
+    const following = users.filter((user) =>
+      data.followings.find((item) => item._id === user.id)
+    );
+    socket.emit("checkUserOnlineToMe", following);
+
+    const clients = users.filter((user) =>
+      data.followers.find((item) => item._id === user.id)
+    );
+    if (clients.length > 0) {
+      clients.forEach((client) => {
+        socket
+          .to(`${client.socketId}`)
+          .emit("checkUserOnlineToClient", data._id);
+      });
+    }
+  });
+
   socket.on("disconnect", () => {
-    console.log("a user disconnected");
-    removeUser(socket.id);
-    removeUser01(socket.id);
-    io.emit("getUsers", users);
-    // io.emit("getUsers01", userList);
+    //get user disconnect
+    const data = users.find((user) => user.socketId === socket.id);
+
+    if (data) {
+      const clients = users.filter((user) =>
+        data.followers.find((item) => item._id === user.id)
+      );
+      if (clients.length > 0) {
+        clients.forEach((client) => {
+          socket
+            .to(`${client.socketId}`)
+            .emit("checkUserOfflineToClient", data.id);
+        });
+      }
+    }
+
+    users = users.filter((user) => user.socketId !== socket.id);
   });
 });
 
-server.listen(8900, () => {
-  console.log("listening on *:8900");
+server.listen(8000, () => {
+  console.log("Socket listening on port 8000");
 });
