@@ -3,6 +3,9 @@ const app = express();
 const server = require("http").createServer(app); // Replace `app` with your Express app instance
 const cors = require("cors");
 
+app.get("/", (req, res) => {
+  res.json({ msg: "hello socket" });
+});
 const io = require("socket.io")(server, {
   cors: {
     origin: "https://socialclient.vercel.app",
