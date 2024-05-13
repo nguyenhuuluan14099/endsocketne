@@ -6,9 +6,18 @@ const cors = require("cors");
 app.get("/", (req, res) => {
   res.json({ msg: "hello socket" });
 });
+
+app.use(function (req, res, next) {
+  res.header("Access-Control-Allow-Origin", "https://socialclient.vercel.app");
+  // Các cấu hình CORS khác nếu cần thiết
+  res.header("Access-Control-Allow-Methods", "GET, POST");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  next();
+});
+
 const io = require("socket.io")(server, {
   cors: {
-    origin: "https://socialclient.vercel.app/",
+    origin: "https://socialclient.vercel.app",
     methods: ["GET", "POST"],
   },
 });
