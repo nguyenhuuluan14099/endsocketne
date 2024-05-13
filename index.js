@@ -8,7 +8,7 @@ app.get("/", (req, res) => {
 });
 const io = require("socket.io")(server, {
   cors: {
-    origin: "https://socialclient.vercel.app/",
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
